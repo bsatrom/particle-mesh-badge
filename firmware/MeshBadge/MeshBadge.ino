@@ -62,26 +62,74 @@ void setup() {
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
 
+  //colorWipe(strip.Color(127, 127, 127), 50); // White
+  strip.show();
+  strip.show(); // Don't know why I have to call this more than once
+  
+  paintScreen();
+}
+
+void paintScreen() {
   // text display tests
-  display.setTextSize(1);
+  display.setTextSize(2);
+  // display.setTextWrap(false);
   display.setTextColor(WHITE);
   display.setCursor(0,0);
-  display.println("Brandon Satrom");
-  display.println("@BrandonSatrom");
-  display.println("brandon@particle.io");
+
+  scrollText("Brandon");
+  //delay(5000);
+  //scrollText("Satrom");
+  //display.println("Brandon Satrom");
+  //display.println("@BrandonSatrom");
+  //display.println("brandon@particle.io");
+  //display.setCursor(0,0);
+  //display.display(); // actually display all of the above
+}
+
+void scrollText(String text) {
+  display.clearDisplay();
+  display.println(text);
   display.setCursor(0,0);
-  display.display(); // actually display all of the above
+  display.display();
+  display.startscrollleft(0x00, 0x0F);
+
+  /*
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(10,0);
+  display.clearDisplay();
+  display.println("scroll");
+  display.display();
+  delay(1);
+ 
+  display.startscrollright(0x00, 0x0F);
+  delay(2000);
+  display.stopscroll();
+  delay(1000);
+  display.startscrollleft(0x00, 0x0F);
+  delay(2000);
+  display.stopscroll();
+  delay(1000);    
+  display.startscrolldiagright(0x00, 0x07);
+  delay(2000);
+  display.startscrolldiagleft(0x00, 0x07);
+  delay(2000);
+  display.stopscroll();
+  */
 }
 
 
 void loop() {
+  // Doesn't work. Need to use Interrupts to manage button presses, etc.
   if (! digitalRead(BUTTON_A)) display.print("A");
-  if (! digitalRead(BUTTON_B)) display.print("B");
+  // if (! digitalRead(BUTTON_B)) display.print("B"); // Don't use button B for prototype
   if (! digitalRead(BUTTON_C)) display.print("C");
-  delay(10);
-  yield();
-  display.display();
-
+  //delay(10);
+  //yield();
+  //display.clearDisplay();
+  //display.display();
+  
+  /*
   // Some example procedures showing how to display to the pixels:
   colorWipe(strip.Color(255, 0, 0), 50); // Red
   colorWipe(strip.Color(0, 255, 0), 50); // Green
@@ -94,6 +142,7 @@ void loop() {
   rainbow(20);
   rainbowCycle(20);
   theaterChaseRainbow(50);
+  */
 }
 
 // Fill the dots one after the other with a color
