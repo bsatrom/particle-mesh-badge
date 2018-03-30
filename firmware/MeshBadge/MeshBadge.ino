@@ -14,11 +14,23 @@
 #define BUTTON_C 14
 #define LED      13
 #define NEOPIXEL_PIN 32
+#define LIPO_PIN A13
+
+// Sketch values
 #define TEXTARRAYSIZE 6
+#define TEXTUPDATEINTERVAL 10 // In seconds
+#define BATTERYCHECKINTERVAL 60 // In seconds
+#define LOWVOLTAGETHRESHOLD 3.5
 
 long lastDisplayChange = 0;
+long lastBatteryCheck = 0;
 int textIndex = 0;
-String textStrings[TEXTARRAYSIZE] = { "Brandon", "Satrom", "@Brandon", "Satrom", "DevRel @", "Particle" };
+bool updateDisplayRotator = true;
+String textStrings[TEXTARRAYSIZE] = { "Brandon", "Satrom", "DevRel @", "Particle", "@Brandon", "Satrom" };
+
+//LiPo Management variables
+float startVoltage = 0;
+float currentVoltage = 0;
 
 Adafruit_SSD1306 display = Adafruit_SSD1306();
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(32, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
@@ -39,16 +51,24 @@ void setup() {
   display.display();
   paintScreen();
 
+  // Check the Voltage of the Power Supply
+  checkBattery();
+
   // Init NeoPixel display
   initNeoPixelDisplay();
 }
 
 void loop() {
-  if (millis() - lastDisplayChange > 10000) {
+  if (millis() - lastDisplayChange > TEXTUPDATEINTERVAL * 1000 && updateDisplayRotator) {
     lastDisplayChange = millis();
 
     display.clearDisplay();
     paintScreen();
+  }
+
+  if (millis() - lastBatteryCheck > BATTERYCHECKINTERVAL * 1000) {
+    lastBatteryCheck = millis();
+    checkBattery();
   }
   
   if (! digitalRead(BUTTON_A)) {
@@ -78,6 +98,22 @@ void loop() {
     delay(10);
     yield();
     display.display();
+  }
+}
+
+int checkBattery() {
+  // Check battery
+  int sensorVal = analogRead(LIPO_PIN);
+  float batteryVoltage = (sensorVal / 4095.0) * 2 * 3.3 * 1.1;
+  
+  currentVoltage = batteryVoltage;  
+
+  // If under the voltage threshold set, display Low Batt message
+  if (currentVoltage < LOWVOLTAGETHRESHOLD) {
+    updateDisplayRotator = false;
+    scrollText("LOW", "BATTERY!", 2);
+    delay(10000);
+    updateDisplayRotator = true;
   }
 }
 
