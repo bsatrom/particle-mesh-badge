@@ -7,147 +7,123 @@
 // NeoPixel Includes
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
-  #include <avr/power.h>
+#include <avr/power.h>
 #endif
-
-Adafruit_SSD1306 display = Adafruit_SSD1306();
 
 #define BUTTON_A 15
-#define BUTTON_B 33
 #define BUTTON_C 14
 #define LED      13
-
 #define NEOPIXEL_PIN 32
+#define TEXTARRAYSIZE 6
 
-// Parameter 1 = number of pixels in strip
-// Parameter 2 = Arduino pin number (most are valid)
-// Parameter 3 = pixel type flags, add together as needed:
-//   NEO_KHZ800  800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
-//   NEO_KHZ400  400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
-//   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
-//   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
-//   NEO_RGBW    Pixels are wired for RGBW bitstream (NeoPixel RGBW products)
+long lastDisplayChange = 0;
+int textIndex = 0;
+String textStrings[TEXTARRAYSIZE] = { "Brandon", "Satrom", "@Brandon", "Satrom", "DevRel @", "Particle" };
+
+Adafruit_SSD1306 display = Adafruit_SSD1306();
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(32, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
-#if (SSD1306_LCDHEIGHT != 32)
- #error("Height incorrect, please fix Adafruit_SSD1306.h!");
-#endif
+void setup() {
+  // Configure Hardware Input Buttons
+  pinMode(BUTTON_A, INPUT_PULLUP);
+  pinMode(BUTTON_C, INPUT_PULLUP);
 
-void setup() {  
-  Serial.begin(115200);
+  // Initialize with the I2C addr 0x3C (for the 128x32)
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 
-  Serial.println("OLED FeatherWing test");
-  // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x32)
-  // init done
-  Serial.println(BUTTON_A);
-  Serial.println("OLED begun");
-  
-  // Show image buffer on the display hardware.
-  // Since the buffer is intialized with an Adafruit splashscreen
-  // internally, this will display the splashscreen.
   display.display();
   delay(1000);
 
   // Clear the buffer.
   display.clearDisplay();
   display.display();
-  
-  Serial.println("IO test");
-
-  pinMode(BUTTON_A, INPUT_PULLUP);
-  pinMode(BUTTON_B, INPUT_PULLUP);
-  pinMode(BUTTON_C, INPUT_PULLUP);
-
-  strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
-
-  //colorWipe(strip.Color(127, 127, 127), 50); // White
-  strip.show();
-  strip.show(); // Don't know why I have to call this more than once
-  
   paintScreen();
+
+  // Init NeoPixel display
+  initNeoPixelDisplay();
+}
+
+void loop() {
+  if (millis() - lastDisplayChange > 10000) {
+    lastDisplayChange = millis();
+
+    display.clearDisplay();
+    paintScreen();
+  }
+  
+  if (! digitalRead(BUTTON_A)) {
+    clearNeoPixelDisplay();
+    strip.setBrightness(25);
+  
+    colorWipe(strip.Color(255, 0, 0), 50); // Red
+    colorWipe(strip.Color(0, 255, 0), 50); // Green
+    colorWipe(strip.Color(0, 0, 255), 50); // Blue
+    // Send a theater pixel chase in...
+    theaterChase(strip.Color(127, 127, 127), 50); // White
+    theaterChase(strip.Color(127, 0, 0), 50); // Red
+    theaterChase(strip.Color(0, 0, 127), 50); // Blue
+
+    rainbow(20);
+    rainbowCycle(20);
+    theaterChaseRainbow(50);
+
+    clearNeoPixelDisplay();
+  }
+
+  if (! digitalRead(BUTTON_C)) {
+    display.clearDisplay();
+    display.stopscroll();
+    display.setCursor(0, 0);
+    display.print("C");
+    delay(10);
+    yield();
+    display.display();
+  }
+}
+
+void initNeoPixelDisplay() {
+  strip.setBrightness(25);
+  strip.begin();
+
+  strip.show(); // Initialize all pixels to 'off'
+  colorWipe(strip.Color(0, 0, 255), 50); // Blue
+}
+
+void clearNeoPixelDisplay() {
+  strip.setBrightness(0);
+  strip.show();
+  strip.show();
+  strip.show(); // Seem to have to call 3x to really get all pixels off
 }
 
 void paintScreen() {
-  // text display tests
-  display.setTextSize(2);
-  // display.setTextWrap(false);
   display.setTextColor(WHITE);
-  display.setCursor(0,0);
+  display.setCursor(0, 0);
 
-  scrollText("Brandon");
-  //delay(5000);
-  //scrollText("Satrom");
-  //display.println("Brandon Satrom");
-  //display.println("@BrandonSatrom");
-  //display.println("brandon@particle.io");
-  //display.setCursor(0,0);
-  //display.display(); // actually display all of the above
+  scrollText(textStrings[textIndex], textStrings[textIndex+1], 2);
+  if (textIndex + 2 == TEXTARRAYSIZE) {
+    textIndex = 0;
+  } else {
+    textIndex = textIndex + 2;
+  }
 }
 
-void scrollText(String text) {
+// Set scrolling text on the OLED screen
+void scrollText(String line1, String line2, int textSize) {
   display.clearDisplay();
-  display.println(text);
-  display.setCursor(0,0);
+  display.setTextWrap(false);
+  display.setTextSize(textSize);
+
+  display.println(line1);
+  display.println(line2);
+  display.setCursor(0, 0);
   display.display();
   display.startscrollleft(0x00, 0x0F);
-
-  /*
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(10,0);
-  display.clearDisplay();
-  display.println("scroll");
-  display.display();
-  delay(1);
- 
-  display.startscrollright(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
-  display.startscrollleft(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);    
-  display.startscrolldiagright(0x00, 0x07);
-  delay(2000);
-  display.startscrolldiagleft(0x00, 0x07);
-  delay(2000);
-  display.stopscroll();
-  */
-}
-
-
-void loop() {
-  // Doesn't work. Need to use Interrupts to manage button presses, etc.
-  if (! digitalRead(BUTTON_A)) display.print("A");
-  // if (! digitalRead(BUTTON_B)) display.print("B"); // Don't use button B for prototype
-  if (! digitalRead(BUTTON_C)) display.print("C");
-  //delay(10);
-  //yield();
-  //display.clearDisplay();
-  //display.display();
-  
-  /*
-  // Some example procedures showing how to display to the pixels:
-  colorWipe(strip.Color(255, 0, 0), 50); // Red
-  colorWipe(strip.Color(0, 255, 0), 50); // Green
-  colorWipe(strip.Color(0, 0, 255), 50); // Blue
-  // Send a theater pixel chase in...
-  theaterChase(strip.Color(127, 127, 127), 50); // White
-  theaterChase(strip.Color(127, 0, 0), 50); // Red
-  theaterChase(strip.Color(0, 0, 127), 50); // Blue
-
-  rainbow(20);
-  rainbowCycle(20);
-  theaterChaseRainbow(50);
-  */
 }
 
 // Fill the dots one after the other with a color
 void colorWipe(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<strip.numPixels(); i++) {
+  for (uint16_t i = 0; i < strip.numPixels(); i++) {
     strip.setPixelColor(i, c);
     strip.show();
     delay(wait);
@@ -157,9 +133,9 @@ void colorWipe(uint32_t c, uint8_t wait) {
 void rainbow(uint8_t wait) {
   uint16_t i, j;
 
-  for(j=0; j<256; j++) {
-    for(i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel((i+j) & 255));
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i + j) & 255));
     }
     strip.show();
     delay(wait);
@@ -170,8 +146,8 @@ void rainbow(uint8_t wait) {
 void rainbowCycle(uint8_t wait) {
   uint16_t i, j;
 
-  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-    for(i=0; i< strip.numPixels(); i++) {
+  for (j = 0; j < 256 * 5; j++) { // 5 cycles of all colors on wheel
+    for (i = 0; i < strip.numPixels(); i++) {
       strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
     }
     strip.show();
@@ -181,17 +157,17 @@ void rainbowCycle(uint8_t wait) {
 
 //Theatre-style crawling lights.
 void theaterChase(uint32_t c, uint8_t wait) {
-  for (int j=0; j<10; j++) {  //do 10 cycles of chasing
-    for (int q=0; q < 3; q++) {
-      for (uint16_t i=0; i < strip.numPixels(); i=i+3) {
-        strip.setPixelColor(i+q, c);    //turn every third pixel on
+  for (int j = 0; j < 10; j++) { //do 10 cycles of chasing
+    for (int q = 0; q < 3; q++) {
+      for (uint16_t i = 0; i < strip.numPixels(); i = i + 3) {
+        strip.setPixelColor(i + q, c);  //turn every third pixel on
       }
       strip.show();
 
       delay(wait);
 
-      for (uint16_t i=0; i < strip.numPixels(); i=i+3) {
-        strip.setPixelColor(i+q, 0);        //turn every third pixel off
+      for (uint16_t i = 0; i < strip.numPixels(); i = i + 3) {
+        strip.setPixelColor(i + q, 0);      //turn every third pixel off
       }
     }
   }
@@ -199,17 +175,17 @@ void theaterChase(uint32_t c, uint8_t wait) {
 
 //Theatre-style crawling lights with rainbow effect
 void theaterChaseRainbow(uint8_t wait) {
-  for (int j=0; j < 256; j++) {     // cycle all 256 colors in the wheel
-    for (int q=0; q < 3; q++) {
-      for (uint16_t i=0; i < strip.numPixels(); i=i+3) {
-        strip.setPixelColor(i+q, Wheel( (i+j) % 255));    //turn every third pixel on
+  for (int j = 0; j < 256; j++) {   // cycle all 256 colors in the wheel
+    for (int q = 0; q < 3; q++) {
+      for (uint16_t i = 0; i < strip.numPixels(); i = i + 3) {
+        strip.setPixelColor(i + q, Wheel( (i + j) % 255)); //turn every third pixel on
       }
       strip.show();
 
       delay(wait);
 
-      for (uint16_t i=0; i < strip.numPixels(); i=i+3) {
-        strip.setPixelColor(i+q, 0);        //turn every third pixel off
+      for (uint16_t i = 0; i < strip.numPixels(); i = i + 3) {
+        strip.setPixelColor(i + q, 0);      //turn every third pixel off
       }
     }
   }
@@ -219,10 +195,10 @@ void theaterChaseRainbow(uint8_t wait) {
 // The colours are a transition r - g - b - back to r.
 uint32_t Wheel(byte WheelPos) {
   WheelPos = 255 - WheelPos;
-  if(WheelPos < 85) {
+  if (WheelPos < 85) {
     return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
   }
-  if(WheelPos < 170) {
+  if (WheelPos < 170) {
     WheelPos -= 85;
     return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
   }
