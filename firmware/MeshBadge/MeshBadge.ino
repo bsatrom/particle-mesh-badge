@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <WiFi.h>
 
 // NeoPixel Includes
 #include <Adafruit_NeoPixel.h>
@@ -20,7 +21,14 @@
 #define TEXTARRAYSIZE 6
 #define TEXTUPDATEINTERVAL 10 // In seconds
 #define BATTERYCHECKINTERVAL 60 // In seconds
-#define LOWVOLTAGETHRESHOLD 3.5
+#define LOWVOLTAGETHRESHOLD 3.3
+
+// Wifi values
+const char* ssid     = "xxxxxx";
+const char* password = "xxxxxx";
+const char* tweetHost = "sheets.googleapis.com"; // Tweets are stored in a Google Sheet via IFTTT
+const char* apiKey = "AIzaSyBzcsBpKziCrhy68nfm6h1Wnw1G6C9S53M";
+const char* sheetId = "1pMINVucqHspaUVzp_kydLzkL9WYeM9D3TnOeb8l1ouw";
 
 long lastDisplayChange = 0;
 long lastBatteryCheck = 0;
@@ -31,11 +39,14 @@ String textStrings[TEXTARRAYSIZE] = { "Brandon", "Satrom", "DevRel @", "Particle
 //LiPo Management variables
 float startVoltage = 0;
 float currentVoltage = 0;
+float maxVoltage = 4.2;
 
 Adafruit_SSD1306 display = Adafruit_SSD1306();
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(32, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 void setup() {
+  Serial.begin(115200);
+
   // Configure Hardware Input Buttons
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
@@ -51,6 +62,14 @@ void setup() {
   display.display();
   paintScreen();
 
+  //Connnect to Wifi
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+  }
+  scrollText("WiFi", "Connected!", 2);
+  
   // Check the Voltage of the Power Supply
   checkBattery();
 
@@ -91,17 +110,11 @@ void loop() {
   }
 
   if (! digitalRead(BUTTON_C)) {
-    display.clearDisplay();
-    display.stopscroll();
-    display.setCursor(0, 0);
-    display.print("C");
-    delay(10);
-    yield();
-    display.display();
+    displayBatteryCharge();
   }
 }
 
-int checkBattery() {
+void checkBattery() {
   // Check battery
   int sensorVal = analogRead(LIPO_PIN);
   float batteryVoltage = (sensorVal / 4095.0) * 2 * 3.3 * 1.1;
@@ -115,6 +128,19 @@ int checkBattery() {
     delay(10000);
     updateDisplayRotator = true;
   }
+}
+
+void displayBatteryCharge() {
+  String chargePercentage = String(currentVoltage / maxVoltage * 100.0) + "%";
+  Serial.println(chargePercentage);
+
+  display.clearDisplay();
+  display.setTextSize(3);
+
+  display.println(chargePercentage);
+  display.setCursor(0, 0);
+  display.display();
+  display.startscrollleft(0x00, 0x0F);
 }
 
 void initNeoPixelDisplay() {
@@ -133,6 +159,7 @@ void clearNeoPixelDisplay() {
 }
 
 void paintScreen() {
+  display.clearDisplay();
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
 
@@ -240,4 +267,51 @@ uint32_t Wheel(byte WheelPos) {
   }
   WheelPos -= 170;
   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+void checkTwitterMentions() {
+  Serial.print("connecting to ");
+  Serial.println(tweetHost);
+
+  // Use WiFiClient class to create TCP connections
+  WiFiClient client;
+  const int httpPort = 443;
+  if (!client.connect(tweetHost, httpPort)) {
+      Serial.println("connection failed");
+      return;
+  }
+
+  // We now create a URI for the request
+  String url = "/v4/spreadsheets/";
+  url += sheetId;
+  url += "/values/D1";
+  url += "?key=";
+  url += apiKey;
+
+  Serial.print("Requesting URL: ");
+  Serial.println(url);
+
+  // Make a HTTP request:
+  client.println(String("GET ") + url + " HTTP/1.0");
+  client.println(String("Host: ") + tweetHost);
+  client.println("Connection: close");
+  client.println();
+    
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 10000) {
+      Serial.println(">>> Client Timeout !");
+      client.stop();
+      return;
+    }
+  }
+
+  // Read all the lines of the reply from server and print them to Serial
+  while(client.available()) {
+    String line = client.readStringUntil('\r');
+    Serial.print(line);
+}
+
+  Serial.println();
+  Serial.println("closing connection");
 }
