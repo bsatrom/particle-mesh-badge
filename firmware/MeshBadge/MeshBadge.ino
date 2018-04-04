@@ -3,7 +3,14 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+
+// Client request libraries
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// Wifi Libraries
 #include <WiFi.h>
+#include <WiFiMulti.h>
 
 // NeoPixel Includes
 #include <Adafruit_NeoPixel.h>
@@ -19,16 +26,23 @@
 
 // Sketch values
 #define TEXTARRAYSIZE 6
-#define TEXTUPDATEINTERVAL 10 // In seconds
-#define BATTERYCHECKINTERVAL 60 // In seconds
+// All in seconds
+#define TEXTUPDATEINTERVAL 10
+#define BATTERYCHECKINTERVAL 60
+#define TWITTERCHECKINTERVAL 360
 #define LOWVOLTAGETHRESHOLD 3.3
 
 // Wifi values
-const char* ssid     = "xxxxxx";
-const char* password = "xxxxxx";
-const char* tweetHost = "sheets.googleapis.com"; // Tweets are stored in a Google Sheet via IFTTT
+WiFiMulti wifiMulti;
+
+const char* ssid     = "5at70m";
+const char* password = "Sarah0812!";
+
+// Rest Interface constants
+const char* tweetHost = "https://sheets.googleapis.com"; // Tweets are stored in a Google Sheet via IFTTT
 const char* apiKey = "AIzaSyBzcsBpKziCrhy68nfm6h1Wnw1G6C9S53M";
 const char* sheetId = "1pMINVucqHspaUVzp_kydLzkL9WYeM9D3TnOeb8l1ouw";
+StaticJsonBuffer<200> jsonBuffer;
 
 long lastDisplayChange = 0;
 long lastBatteryCheck = 0;
@@ -63,18 +77,20 @@ void setup() {
   paintScreen();
 
   //Connnect to Wifi
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
+  wifiMulti.addAP(ssid, password);
+  while (wifiMulti.run() != WL_CONNECTED) {
+    delay(500);
   }
   scrollText("WiFi", "Connected!", 2);
-  
+
   // Check the Voltage of the Power Supply
   checkBattery();
 
   // Init NeoPixel display
   initNeoPixelDisplay();
+
+  // Check twitter
+  // checkTwitterMentions();
 }
 
 void loop() {
@@ -89,11 +105,11 @@ void loop() {
     lastBatteryCheck = millis();
     checkBattery();
   }
-  
+
   if (! digitalRead(BUTTON_A)) {
     clearNeoPixelDisplay();
     strip.setBrightness(25);
-  
+
     colorWipe(strip.Color(255, 0, 0), 50); // Red
     colorWipe(strip.Color(0, 255, 0), 50); // Green
     colorWipe(strip.Color(0, 0, 255), 50); // Blue
@@ -118,8 +134,8 @@ void checkBattery() {
   // Check battery
   int sensorVal = analogRead(LIPO_PIN);
   float batteryVoltage = (sensorVal / 4095.0) * 2 * 3.3 * 1.1;
-  
-  currentVoltage = batteryVoltage;  
+
+  currentVoltage = batteryVoltage;
 
   // If under the voltage threshold set, display Low Batt message
   if (currentVoltage < LOWVOLTAGETHRESHOLD) {
@@ -163,7 +179,7 @@ void paintScreen() {
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
 
-  scrollText(textStrings[textIndex], textStrings[textIndex+1], 2);
+  scrollText(textStrings[textIndex], textStrings[textIndex + 1], 2);
   if (textIndex + 2 == TEXTARRAYSIZE) {
     textIndex = 0;
   } else {
@@ -270,48 +286,60 @@ uint32_t Wheel(byte WheelPos) {
 }
 
 void checkTwitterMentions() {
-  Serial.print("connecting to ");
-  Serial.println(tweetHost);
-
-  // Use WiFiClient class to create TCP connections
-  WiFiClient client;
-  const int httpPort = 443;
-  if (!client.connect(tweetHost, httpPort)) {
-      Serial.println("connection failed");
-      return;
-  }
-
-  // We now create a URI for the request
-  String url = "/v4/spreadsheets/";
+  // Create a URI for the request
+  String url = tweetHost;
+  url += "/v4/spreadsheets/";
   url += sheetId;
-  url += "/values/D1";
-  url += "?key=";
+  url += "/values:batchGet?dateTimeRenderOption=SERIAL_NUMBER&majorDimension=COLUMNS&ranges=D1%3AD500&valueRenderOption=UNFORMATTED_VALUE";
+  url += "&key=";
   url += apiKey;
 
   Serial.print("Requesting URL: ");
   Serial.println(url);
 
-  // Make a HTTP request:
-  client.println(String("GET ") + url + " HTTP/1.0");
-  client.println(String("Host: ") + tweetHost);
-  client.println("Connection: close");
-  client.println();
-    
-  unsigned long timeout = millis();
-  while (client.available() == 0) {
-    if (millis() - timeout > 10000) {
-      Serial.println(">>> Client Timeout !");
-      client.stop();
-      return;
+  // Use WiFiClient class to create TCP connections
+  HTTPClient http;
+  http.begin(url);
+
+  int httpCode = http.GET();
+
+  // httpCode will be negative on error
+  if (httpCode > 0) {
+    // HTTP header has been send and Server response header has been handled
+    // file found at server
+    if (httpCode == HTTP_CODE_OK) {
+      int len = http.getSize();
+      // create buffer for read
+      uint8_t buff[128] = { 0 };
+
+      //WiFiClient * stream = http.getStreamPtr();
+      
+      // read all data from server
+      //while (http.connected() && (len > 0 || len == -1)) {
+        // get available data size
+        //size_t size = stream->available();
+
+        //if (size) {
+          // read up to 128 byte
+          //int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+          String root = http.getString();
+
+          // write it to a String
+          //Serial.write(buff, c);
+          //JsonArray& root = jsonBuffer.parseArray(buff);
+          
+          Serial.printf("[ROOT]: %s\n", root);
+          
+          //if (len > 0) {
+          //  len -= c;
+          //}
+        //} else {
+          http.end();
+        //}
+        //delay(1);
+      //}
     }
   }
 
-  // Read all the lines of the reply from server and print them to Serial
-  while(client.available()) {
-    String line = client.readStringUntil('\r');
-    Serial.print(line);
-}
-
-  Serial.println();
-  Serial.println("closing connection");
+  http.end();
 }
