@@ -10,14 +10,16 @@
 #include <avr/power.h>
 #endif
 
+
+// Pins, pins, pins
 #define BUTTON_A 15
 #define BUTTON_C 14
 #define LED      13
 #define NEOPIXEL_PIN 32
 #define LIPO_PIN A13
 
-// Sketch values
 #define TEXTARRAYSIZE 6
+
 // All in seconds
 #define TEXTUPDATEINTERVAL 10
 #define BATTERYCHECKINTERVAL 60
@@ -44,8 +46,6 @@ Adafruit_SSD1306 display = Adafruit_SSD1306();
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(32, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 void setup() {
-  Serial.begin(115200);
-
   // Configure Hardware Input Buttons
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
@@ -57,6 +57,7 @@ void setup() {
   display.display();
   delay(1000);
 
+  // Start the process to paint the OLED
   paintScreen();
 
   // Check the Voltage of the Power Supply
@@ -84,7 +85,7 @@ void loop() {
     neoPixelsUpdating = true;
     
     clearNeoPixelDisplay();
-    strip.setBrightness(25);
+    strip.setBrightness(15);
 
     colorWipe(strip.Color(255, 0, 0), 50); // Red
     colorWipe(strip.Color(0, 255, 0), 50); // Green
@@ -130,8 +131,7 @@ void checkBattery() {
 
 void displayBatteryCharge() {
   String chargePercentage = String(currentVoltage / maxVoltage * 100.0) + "%";
-  Serial.println(chargePercentage);
-
+  
   display.clearDisplay();
   display.setTextSize(3);
 
