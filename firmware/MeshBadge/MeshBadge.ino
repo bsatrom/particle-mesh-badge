@@ -10,7 +10,6 @@
 #include <avr/power.h>
 #endif
 
-
 // Pins, pins, pins
 #define BUTTON_A 15
 #define BUTTON_C 14
@@ -36,6 +35,7 @@ String textStrings[TEXTARRAYSIZE] = { "Brandon", "Satrom", "DevRel @", "Particle
 bool displayUpdating = false;
 bool neoPixelsUpdating = false;
 bool batteryChecking = false;
+bool clearingDisplay = false;
 
 //LiPo Management variables
 float startVoltage = 0;
@@ -68,22 +68,18 @@ void setup() {
 }
 
 void loop() {
-  if (millis() - lastDisplayChange > TEXTUPDATEINTERVAL * 1000 && updateDisplayRotator && !displayUpdating) {
-    displayUpdating = true;
-    lastDisplayChange = millis();
+  // If both buttons are pressed, clear the display
+  if (! digitalRead(BUTTON_C) && ! digitalRead(BUTTON_A) && !clearingDisplay) {
+    clearingDisplay = true;
+    clearNeoPixelDisplay();
+    clearingDisplay = false;
 
-    paintScreen();
-    displayUpdating = false;
-  }
-
-  if (millis() - lastBatteryCheck > BATTERYCHECKINTERVAL * 1000) {
-    lastBatteryCheck = millis();
-    checkBattery();
+    return;
   }
 
   if (! digitalRead(BUTTON_A) && !neoPixelsUpdating) {
     neoPixelsUpdating = true;
-    
+
     clearNeoPixelDisplay();
     strip.setBrightness(15);
 
@@ -102,14 +98,33 @@ void loop() {
     clearNeoPixelDisplay();
 
     neoPixelsUpdating = false;
+
+    return;
   }
 
   if (! digitalRead(BUTTON_C) && !batteryChecking) {
     batteryChecking = true;
-    
     displayBatteryCharge();
-
     batteryChecking = false;
+
+    return;
+  }
+
+  if (millis() - lastDisplayChange > TEXTUPDATEINTERVAL * 1000 && updateDisplayRotator && !displayUpdating) {
+    displayUpdating = true;
+    lastDisplayChange = millis();
+
+    paintScreen();
+    displayUpdating = false;
+
+    return;
+  }
+
+  if (millis() - lastBatteryCheck > BATTERYCHECKINTERVAL * 1000) {
+    lastBatteryCheck = millis();
+    checkBattery();
+
+    return;
   }
 }
 
@@ -130,12 +145,17 @@ void checkBattery() {
 }
 
 void displayBatteryCharge() {
-  String chargePercentage = String(currentVoltage / maxVoltage * 100.0) + "%";
-  
+  float charge = currentVoltage / maxVoltage * 100.0;
+  String chargePercentage = String(charge) + "%";
+
   display.clearDisplay();
   display.setTextSize(3);
 
-  display.println(chargePercentage);
+  if (charge > 100.00) {
+    display.println("On USB!");
+  } else {
+    display.println(chargePercentage);
+  }
   display.setCursor(0, 0);
   display.display();
   display.startscrollleft(0x00, 0x0F);
